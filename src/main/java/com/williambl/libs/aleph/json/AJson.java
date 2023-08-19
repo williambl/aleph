@@ -2,6 +2,7 @@ package com.williambl.libs.aleph.json;
 
 import com.google.gson.*;
 import com.williambl.libs.aleph.either.Either;
+import com.williambl.libs.aleph.failure.Failure;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.Unmodifiable;
 
@@ -89,6 +90,24 @@ public sealed interface AJson {
         }
     }
 
+    static String name(Class<? extends AJson> clazz) {
+        if (clazz == AJsonString.class) {
+            return "String";
+        } else if (clazz == AJsonNumber.class) {
+            return "Number";
+        } else if (clazz == AJsonBoolean.class) {
+            return "Boolean";
+        } else if (clazz == AJsonNull.class) {
+            return "Null";
+        } else if (clazz == AJsonArray.class) {
+            return "Array";
+        } else if (clazz == AJsonObject.class) {
+            return "Object";
+        } else {
+            return "JSON";
+        }
+    }
+
     //TODO write
 
     record AJsonString(String value) implements AJson {}
@@ -107,6 +126,17 @@ public sealed interface AJson {
         public Optional<AJson> maybeGet(int index) {
             return Optional.ofNullable(this.get(index));
         }
+
+        public Either<AJson, Failure> tryGet(int index) {
+            return Either.of(this.maybeGet(index), () -> JsonGetFailure.noElement(index, this));
+        }
+
+        public <T extends AJson> Either<T, Failure> tryGet(int index, Class<T> clazz) {
+            return this.tryGet(index).flatMapLeft(j ->
+                    clazz.isInstance(j) ?
+                            Either.left(clazz.cast(j)) :
+                            Either.right(JsonGetFailure.wrongType(Integer.toString(index), clazz, j.getClass(), j)));
+        }
     }
     record AJsonObject(@Unmodifiable Map<String, AJson> properties) implements AJson {
         public AJsonObject(Map<String, AJson> properties) {
@@ -119,6 +149,17 @@ public sealed interface AJson {
 
         public Optional<AJson> maybeGet(String key) {
             return Optional.ofNullable(this.properties.get(key));
+        }
+
+        public Either<AJson, Failure> tryGet(String key) {
+            return Either.of(this.maybeGet(key), () -> JsonGetFailure.noProperty(key, this));
+        }
+
+        public <T extends AJson> Either<T, Failure> tryGet(String key, Class<T> clazz) {
+            return this.tryGet(key).flatMapLeft(j ->
+                    clazz.isInstance(j) ?
+                            Either.left(clazz.cast(j)) :
+                            Either.right(JsonGetFailure.wrongType(key, clazz, j.getClass(), j)));
         }
     }
 }

@@ -4,6 +4,7 @@ import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 import org.jetbrains.annotations.Nullable;
 
@@ -42,7 +43,17 @@ public abstract sealed class Either<L, R> {
     public static <L, R> Either<L, R> of(@Nullable L left, R right) {
         return left == null ? right(right) : left(left);
     }
-    
+
+    /**
+     * Creates an Either from the contents of the left optional if present, or else get the right value.
+     * @param leftOpt  the left value optional
+     * @param rightSup the right value supplier
+     * @return         the Either
+     */
+    public static <L, R> Either<L, R> of(Optional<L> leftOpt, Supplier<R> rightSup) {
+        return leftOpt.<Either<L, R>>map(Either::left).orElseGet(() -> Either.right(rightSup.get()));
+    }
+
     /**
      * Maps both sides of the Either.
      * @param leftFunc  the function to map the left side
