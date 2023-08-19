@@ -1,10 +1,13 @@
 package com.williambl.libs.aleph.either;
 
+import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
+import java.util.stream.Collector;
 
 import org.jetbrains.annotations.Nullable;
 
@@ -52,6 +55,59 @@ public abstract sealed class Either<L, R> {
      */
     public static <L, R> Either<L, R> of(Optional<L> leftOpt, Supplier<R> rightSup) {
         return leftOpt.<Either<L, R>>map(Either::left).orElseGet(() -> Either.right(rightSup.get()));
+    }
+
+    /**
+     * Creates an Either from the contents of the right optional if present, or else get the left value.
+     * @param leftSup  the left value supplier
+     * @param rightOpt the right value optional
+     * @return         the Either
+     */
+    public static <L, R> Either<L, R> of(Supplier<L> leftSup, Optional<R> rightOpt) {
+        return rightOpt.<Either<L, R>>map(Either::right).orElseGet(() -> Either.left(leftSup.get()));
+    }
+
+    /**
+     * If {@code toVerif} holds a left value, and {@code possibleErr} outputs a non-empty Optional for that value,
+     * returns a right Either of that output. Otherwise, returns an Either equal to the original Either.
+     * @param toVerif       the Either to verify the left side of
+     * @param possibleErr   function that returns an optional right error for the left value
+     * @return              a right Either of the unwrapped output of {@code possibleErr}, or an Either equal to the input
+     * @see #verifyList(Either, Function, Collector)
+     */
+    public static <L, R> Either<L, R> verify(Either<L, R> toVerif, Function<L, Optional<R>> possibleErr) {
+        return toVerif.flatMapLeft(l -> Either.of(() -> l, possibleErr.apply(l)));
+    }
+
+    /**
+     * Given a list of Eithers, if all are left-valued, returns a left Either of the unwrapped values of those Eithers.
+     * Otherwise, returns a right Either of all the right values found in the list, combined with the {@code errJoiner}
+     * collector.
+     * @param list      the list of eithers
+     * @param errJoiner a {@link Collector} to collect right values
+     * @return          an Either of a list of left values, or a combined right value
+     */
+    public static <L, R, R1> Either<List<L>, R> bubbleErrorsUp(List<Either<L, R1>> list, Collector<? super R1, ?, R> errJoiner) {
+        return Either.<List<L>, List<R1>>right(list.stream().map(Either::maybeR).filter(Optional::isPresent).map(Optional::get).toList())
+                .flatMapRight(errs -> errs.isEmpty() ? Either.left(list.stream().map(e -> e.left()).toList()) : Either.right(errs.stream().collect(errJoiner)));
+    }
+
+    /**
+     * If {@code toVerif} holds a left value (a list), and {@code possibleErr} outputs a non-empty Optional for every value in the list,
+     * returns a right Either of the right outputs, combined with {@code errJoiner}. Otherwise, returns an Either equal
+     * to the original Either.
+     * @param toVerif       the Either to verify the left side list of
+     * @param possibleErr   function that returns an optional right error for an element of the left side
+     * @param errJoiner     a {@link Collector} to collect right values
+     * @return              a right Either of a list of the unwrapped outputs of {@code possibleErr}, or an Either equal to the input
+     * @see #verify(Either, Function)
+     * @see #bubbleErrorsUp(List, Collector)
+     */
+    public static <L, R, R1> Either<List<L>, R> verifyList(Either<List<L>, R> toVerif, Function<L, Optional<R1>> possibleErr, Collector<? super R1, ?, R> errJoiner) {
+        return toVerif.flatMapBoth(ls ->
+                bubbleErrorsUp(ls.stream().map(Either::<L, R1>left).map(e -> Either.verify(e, possibleErr)).toList(), errJoiner),
+                Either::right
+        );
     }
 
     /**
