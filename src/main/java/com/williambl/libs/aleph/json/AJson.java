@@ -8,6 +8,7 @@ import org.jetbrains.annotations.Unmodifiable;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -22,27 +23,21 @@ public sealed interface AJson {
      * @throws IllegalStateException    if the JsonElement is not a primitive, null, object, or array. If this throws, it's a bug!
      */
     static AJson fromGson(JsonElement element) {
-        switch (element) {
-            case JsonNull ignored, null -> {
-                return new AJsonNull();
+        //TODO replace with pattern-matched switch in java 21
+        if (element instanceof JsonNull || element == null) {
+            return new AJsonNull();
+        } else if (element instanceof JsonPrimitive prim) {
+            if (prim.isString()) {
+                return new AJsonString(prim.getAsString());
+            } else if (prim.isNumber()) {
+                return new AJsonNumber(prim.getAsDouble());
+            } else if (prim.isBoolean()) {
+                return new AJsonBoolean(prim.getAsBoolean());
             }
-            case JsonPrimitive prim -> {
-                if (prim.isString()) {
-                    return new AJsonString(prim.getAsString());
-                } else if (prim.isNumber()) {
-                    return new AJsonNumber(prim.getAsDouble());
-                } else if (prim.isBoolean()) {
-                    return new AJsonBoolean(prim.getAsBoolean());
-                }
-            }
-            case JsonArray arr -> {
-                return new AJsonArray(arr.asList().stream().map(AJson::fromGson).toList());
-            }
-            case JsonObject obj -> {
-                return new AJsonObject(obj.asMap().entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey, kv -> AJson.fromGson(kv.getValue()))));
-            }
-            default -> {
-            }
+        } else if (element instanceof JsonArray arr) {
+            return new AJsonArray(arr.asList().stream().map(AJson::fromGson).toList());
+        } else if (element instanceof JsonObject obj) {
+            return new AJsonObject(obj.asMap().entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey, kv -> AJson.fromGson(kv.getValue()))));
         }
 
         throw new IllegalStateException("Gson element %s was not a string, number, boolean, null, array, or object".formatted(element));
@@ -54,26 +49,30 @@ public sealed interface AJson {
      * @return      the GSON representation
      */
     static JsonElement toGson(AJson json) {
-        return switch (json) {
-            case AJsonString str -> new JsonPrimitive(str.value());
-            case AJsonNumber num -> new JsonPrimitive(num.value());
-            case AJsonBoolean bool -> new JsonPrimitive(bool.value());
-            case AJsonNull ignored -> JsonNull.INSTANCE;
-            case AJsonArray arr -> {
-                var jsonArray = new JsonArray();
-                for (var element : arr.values()) {
-                    jsonArray.add(toGson(element));
-                }
-                yield jsonArray;
+        //TODO replace with pattern-matched switch in java 21
+        if (Objects.requireNonNull(json) instanceof AJsonString str) {
+            return new JsonPrimitive(str.value());
+        } else if (json instanceof AJsonNumber num) {
+            return new JsonPrimitive(num.value());
+        } else if (json instanceof AJsonBoolean bool) {
+            return new JsonPrimitive(bool.value());
+        } else if (json instanceof AJsonNull) {
+            return JsonNull.INSTANCE;
+        } else if (json instanceof AJsonArray arr) {
+            var jsonArray = new JsonArray();
+            for (var element : arr.values()) {
+                jsonArray.add(toGson(element));
             }
-            case AJsonObject obj -> {
-                var jsonObj = new JsonObject();
-                for (var prop : obj.properties().entrySet()) {
-                    jsonObj.add(prop.getKey(), toGson(prop.getValue()));
-                }
-                yield jsonObj;
+            return jsonArray;
+        } else if (json instanceof AJsonObject obj) {
+            var jsonObj = new JsonObject();
+            for (var prop : obj.properties().entrySet()) {
+                jsonObj.add(prop.getKey(), toGson(prop.getValue()));
             }
-        };
+            return jsonObj;
+        }
+
+        throw new IncompatibleClassChangeError("An AJson must be a string, number, boolean, null, array, or object, but it was %s".formatted(json.getClass()));
     }
 
     /**
