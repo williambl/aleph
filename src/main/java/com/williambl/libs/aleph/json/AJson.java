@@ -122,6 +122,14 @@ public sealed interface AJson {
         }
     }
 
+    default <T extends AJson> Either<T, JsonGetFailure> tryGetAs(Class<T> clazz) {
+        if (clazz.isInstance(this)) {
+            return Either.left(clazz.cast(this));
+        } else {
+            return Either.right(JsonGetFailure.wrongType("JSON", clazz, this.getClass(), this));
+        }
+    }
+
     //TODO write
 
     record AJsonString(String value) implements AJson {}
