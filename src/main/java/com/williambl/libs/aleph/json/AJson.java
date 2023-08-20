@@ -6,6 +6,7 @@ import com.williambl.libs.aleph.failure.Failure;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.Unmodifiable;
 
+import java.io.Reader;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -86,6 +87,20 @@ public sealed interface AJson {
             return Either.left(AJson.fromGson(JsonParser.parseString(str)));
         } catch (JsonParseException e) {
             return Either.right(new JsonParseFailure(e.getMessage(), Optional.of(e), Optional.of(str)));
+        }
+    }
+
+    /**
+     * Try to parse the given reader as an AJson, with failures represented as {@link JsonParseFailure}.
+     * JSON parsing is done with GSON in lenient mode.
+     * @param reader    the reader to parse as JSON
+     * @return          either a parsed JSON, or a failure.
+     */
+    static Either<AJson, JsonParseFailure> parse(Reader reader) {
+        try {
+            return Either.left(AJson.fromGson(JsonParser.parseReader(reader)));
+        } catch (JsonParseException e) {
+            return Either.right(new JsonParseFailure(e.getMessage(), Optional.of(e), Optional.empty()));
         }
     }
 
