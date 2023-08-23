@@ -21,7 +21,7 @@ public class AHttp {
      * @return              an Either of the response with correct status code, or a failure
      */
     public static <T> Either<HttpResponse<T>, HttpStatusFailure<T>> expectStatus(HttpResponse<T> response, int expectedCode) {
-        return response.statusCode() == expectedCode ? Either.left(response) : Either.right(new HttpStatusFailure<T>("Expected status %s from HTTP response, got status %s.", expectedCode, response.statusCode(), response));
+        return response.statusCode() == expectedCode ? Either.left(response) : Either.right(new HttpStatusFailure<T>("Expected status %s from HTTP response, got status %s.".formatted(expectedCode, response.statusCode()), expectedCode, response.statusCode(), response));
     }
 
     /**
