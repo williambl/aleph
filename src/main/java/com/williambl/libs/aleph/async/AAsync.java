@@ -39,4 +39,15 @@ public class AAsync {
             Either<CompletableFuture<L>, ? extends Failure> eitherIn) {
         return AAsync.unwrapFuture(eitherIn, e -> new AsyncFailure(e.getMessage(), Optional.of(e)));
     }
+
+    /**
+     * Performs an operation analagous to an {@link Either#flatMapLeft(Function)} on a CompletableFuture of an Either.
+     * @param either    a CompletableFuture of an Either
+     * @param func      the function to map the Either's left side to a CompletableFuture of a new Either
+     * @return          a CompletableFuture of the flatmapped Either
+     */
+    public static <LIn, LOut> CompletableFuture<Either<LOut, Failure>> flatMapLeftAsync(CompletableFuture<Either<LIn, Failure>> either, Function<LIn, CompletableFuture<Either<LOut, Failure>>> func) {
+        return either.thenCompose(e -> unwrapFuture(e.mapLeft(func)))
+                .thenApply(e -> e.flatMapLeft($ -> $));
+    }
 }
