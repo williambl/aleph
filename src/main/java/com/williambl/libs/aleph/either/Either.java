@@ -18,13 +18,13 @@ import org.jetbrains.annotations.Nullable;
  * @param <L> the type of the left value
  * @param <R> the type of the right value
  */
-public abstract sealed class Either<L, R> {
+public sealed interface Either<L, R> {
     /**
      * Creates a left Either with the given value.
      * @param value the value
      * @return      the Either
      */
-    public static <L, R> Either<L, R> left(L value) {
+    static <L, R> Either<L, R> left(L value) {
         return new Left<>(value);
     }
 
@@ -33,7 +33,7 @@ public abstract sealed class Either<L, R> {
      * @param value the value
      * @return      the Either
      */
-    public static <L, R> Either<L, R> right(R value) {
+    static <L, R> Either<L, R> right(R value) {
         return new Right<>(value);
     }
 
@@ -43,7 +43,7 @@ public abstract sealed class Either<L, R> {
      * @param right the right value
      * @return      the Either
      */
-    public static <L, R> Either<L, R> of(@Nullable L left, R right) {
+    static <L, R> Either<L, R> of(@Nullable L left, R right) {
         return left == null ? right(right) : left(left);
     }
 
@@ -53,7 +53,7 @@ public abstract sealed class Either<L, R> {
      * @param rightSup the right value supplier
      * @return         the Either
      */
-    public static <L, R> Either<L, R> of(Optional<L> leftOpt, Supplier<R> rightSup) {
+    static <L, R> Either<L, R> of(Optional<L> leftOpt, Supplier<R> rightSup) {
         return leftOpt.<Either<L, R>>map(Either::left).orElseGet(() -> Either.right(rightSup.get()));
     }
 
@@ -63,7 +63,7 @@ public abstract sealed class Either<L, R> {
      * @param rightOpt the right value optional
      * @return         the Either
      */
-    public static <L, R> Either<L, R> of(Supplier<L> leftSup, Optional<R> rightOpt) {
+    static <L, R> Either<L, R> of(Supplier<L> leftSup, Optional<R> rightOpt) {
         return rightOpt.<Either<L, R>>map(Either::right).orElseGet(() -> Either.left(leftSup.get()));
     }
 
@@ -75,7 +75,7 @@ public abstract sealed class Either<L, R> {
      * @return              a right Either of the unwrapped output of {@code possibleErr}, or an Either equal to the input
      * @see #verifyList(Either, Function, Collector)
      */
-    public static <L, R> Either<L, R> verify(Either<L, R> toVerif, Function<L, Optional<R>> possibleErr) {
+    static <L, R> Either<L, R> verify(Either<L, R> toVerif, Function<L, Optional<R>> possibleErr) {
         return toVerif.flatMapLeft(l -> Either.of(() -> l, possibleErr.apply(l)));
     }
 
@@ -87,7 +87,7 @@ public abstract sealed class Either<L, R> {
      * @param errJoiner a {@link Collector} to collect right values
      * @return          an Either of a list of left values, or a combined right value
      */
-    public static <L, R, R1> Either<List<L>, R> bubbleErrorsUp(List<Either<L, R1>> list, Collector<? super R1, ?, R> errJoiner) {
+    static <L, R, R1> Either<List<L>, R> bubbleErrorsUp(List<Either<L, R1>> list, Collector<? super R1, ?, R> errJoiner) {
         return Either.<List<L>, List<R1>>right(list.stream().map(Either::maybeR).filter(Optional::isPresent).map(Optional::get).toList())
                 .flatMapRight(errs -> errs.isEmpty() ? Either.left(list.stream().map(e -> e.left()).toList()) : Either.right(errs.stream().collect(errJoiner)));
     }
@@ -103,7 +103,7 @@ public abstract sealed class Either<L, R> {
      * @see #verify(Either, Function)
      * @see #bubbleErrorsUp(List, Collector)
      */
-    public static <L, R, R1> Either<List<L>, R> verifyList(Either<List<L>, R> toVerif, Function<L, Optional<R1>> possibleErr, Collector<? super R1, ?, R> errJoiner) {
+    static <L, R, R1> Either<List<L>, R> verifyList(Either<List<L>, R> toVerif, Function<L, Optional<R1>> possibleErr, Collector<? super R1, ?, R> errJoiner) {
         return toVerif.flatMapBoth(ls ->
                 bubbleErrorsUp(ls.stream().map(Either::<L, R1>left).map(e -> Either.verify(e, possibleErr)).toList(), errJoiner),
                 Either::right
@@ -116,14 +116,14 @@ public abstract sealed class Either<L, R> {
      * @param rightFunc the function to map the right side
      * @return          the mapped Either
      */
-    public abstract <L1, R1> Either<L1, R1> mapBoth(Function<L, L1> leftFunc, Function<R, R1> rightFunc);
+    <L1, R1> Either<L1, R1> mapBoth(Function<L, L1> leftFunc, Function<R, R1> rightFunc);
 
     /**
      * Maps the left side of the Either.
      * @param func  the function to map the left side
      * @return      the mapped Either
      */
-    public <L1> Either<L1, R> mapLeft(Function<L, L1> func) {
+    default <L1> Either<L1, R> mapLeft(Function<L, L1> func) {
         return this.mapBoth(func, Function.identity());
     }
 
@@ -132,7 +132,7 @@ public abstract sealed class Either<L, R> {
      * @param func  the function to map the right side
      * @return      the mapped Either
      */
-    public <R1> Either<L, R1> mapRight(Function<R, R1> func) {
+    default <R1> Either<L, R1> mapRight(Function<R, R1> func) {
         return this.mapBoth(Function.identity(), func);
     }
 
@@ -142,14 +142,14 @@ public abstract sealed class Either<L, R> {
      * @param rightFunc the function to flatmap the right side
      * @return          the flatmapped Either
      */
-    public abstract <L1, R1> Either<L1, R1> flatMapBoth(Function<L, Either<L1, R1>> leftFunc, Function<R, Either<L1, R1>> rightFunc);
+    <L1, R1> Either<L1, R1> flatMapBoth(Function<L, Either<L1, R1>> leftFunc, Function<R, Either<L1, R1>> rightFunc);
 
     /**
      * Flatmaps the left side of the Either.
      * @param func  the function to flatmap the left side
      * @return      the flatmapped Either
      */
-    public <L1> Either<L1, R> flatMapLeft(Function<L, Either<L1, R>> func) {
+    default <L1> Either<L1, R> flatMapLeft(Function<L, Either<L1, R>> func) {
         return this.flatMapBoth(func, Either::right);
     }
 
@@ -158,7 +158,7 @@ public abstract sealed class Either<L, R> {
      * @param func  the function to flatmap the right side
      * @return      the flatmapped Either
      */
-    public <R1> Either<L, R1> flatMapRight(Function<R, Either<L, R1>> func) {
+    default <R1> Either<L, R1> flatMapRight(Function<R, Either<L, R1>> func) {
         return this.flatMapBoth(Either::left, func);
     }
 
@@ -168,60 +168,54 @@ public abstract sealed class Either<L, R> {
      * @param rightFunc the function to map the right side
      * @return          the mapped value
      */
-    public abstract <T> T map(Function<L, T> leftFunc, Function<R, T> rightFunc);
+    <T> T map(Function<L, T> leftFunc, Function<R, T> rightFunc);
 
     /**
      * Consumes either side of the Either.
      * @param leftFunc  the function to consume the left side
      * @param rightFunc the function to consume the right side
      */
-    public abstract void consume(Consumer<L> leftFunc, Consumer<R> rightFunc);
+    void consume(Consumer<L> leftFunc, Consumer<R> rightFunc);
 
     /**
      * Whether this Either holds a left value.
      * @return whether this Either holds a left value
      */
-    public abstract boolean isLeft();
+    boolean isLeft();
 
     /**
      * Whether this Either holds a right value.
      * @return whether this Either holds a right value
      */
-    public abstract boolean isRight();
+    boolean isRight();
 
     /**
      * Gets the left value of this Either.
      * @return the left value
      * @throws NoSuchElementException if this Either does not hold a left value
      */
-    public abstract L left();
+    L left();
 
     /**
      * Gets the right value of this Either.
      * @return the right value
      * @throws NoSuchElementException if this Either does not hold a right value
      */
-    public abstract R right();
+    R right();
 
     /**
      * Gets the left value of this Either wrapped in an Optional, or an empty Optional if there is no left value.
      * @return the left value wrapped in an Optional
      */
-    public abstract Optional<L> maybeL();
+    Optional<L> maybeL();
 
     /**
      * Gets the right value of this Either wrapped in an Optional, or an empty Optional if there is no right value.
      * @return the right value wrapped in an Optional
      */
-    public abstract Optional<R> maybeR();
+    Optional<R> maybeR();
 
-    private static final class Left<L, R> extends Either<L, R> {
-        private final L value;
-
-        private Left(L value) {
-            this.value = value;
-        }
-
+    record Left<L, R>(L value) implements Either<L, R> {
         @Override
         public <L1, R1> Either<L1, R1> mapBoth(Function<L, L1> leftFunc, Function<R, R1> rightFunc) {
             return new Left<>(leftFunc.apply(this.value));
@@ -273,13 +267,7 @@ public abstract sealed class Either<L, R> {
         }
     }
 
-    private static final class Right<L, R> extends Either<L, R> {
-        private final R value;
-
-        private Right(R value) {
-            this.value = value;
-        }
-
+    record Right<L, R>(R value) implements Either<L, R> {
         @Override
         public <L1, R1> Either<L1, R1> mapBoth(Function<L, L1> leftFunc, Function<R, R1> rightFunc) {
             return new Right<>(rightFunc.apply(this.value));
