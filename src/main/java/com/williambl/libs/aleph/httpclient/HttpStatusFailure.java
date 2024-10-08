@@ -8,7 +8,7 @@ import java.util.Optional;
 /**
  * Represents a failure arising from an unexpected status from an HTTP response.
  */
-public record HttpStatusFailure<T>(String description, int expectedCode, int actualCode, HttpResponse<T> response) implements Failure {
+public record HttpStatusFailure<T>(String description, String expectedCode, int actualCode, HttpResponse<T> response) implements Failure {
     @Override
     public Optional<Failure> cause() {
         return Optional.empty();
