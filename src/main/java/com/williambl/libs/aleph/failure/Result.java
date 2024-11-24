@@ -85,7 +85,7 @@ public sealed interface Result<E> {
      * @param errJoiner a {@link Collector} to collect failure values
      * @return          an Result of a list of values, or a combined failure value
      */
-    static <L> Result<List<L>> bubbleErrorsUp(List<Result<L>> list, Collector<? super Failure, ?, Failure> errJoiner) {
+    static <L> Result<List<L>> bubbleErrorsUp(List<Result<L>> list, Collector<? super Failure, ?, ? extends Failure> errJoiner) {
         return fromEither(Either.bubbleErrorsUp(list.stream().map(Result::toEither).toList(), errJoiner));
     }
 
