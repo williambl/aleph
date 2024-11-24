@@ -1,6 +1,7 @@
 package com.williambl.libs.aleph.uuid;
 
 import com.williambl.libs.aleph.either.Either;
+import com.williambl.libs.aleph.failure.Result;
 import com.williambl.libs.aleph.json.JsonParseFailure;
 
 import java.util.Optional;
@@ -12,8 +13,9 @@ import java.util.UUID;
 public class AUuid {
     /**
      * Try to parse the given string as a UUID.
-     * @param str   the string to parse as a UUID
-     * @return      either a parsed UUID, or an empty optional
+     *
+     * @param str the string to parse as a UUID
+     * @return either a parsed UUID, or an empty optional
      */
     public static Optional<UUID> maybeMakeUuid(String str) {
         try {
@@ -25,14 +27,15 @@ public class AUuid {
 
     /**
      * Try to parse the given string as a UUID, with failures represented as {@link UuidParseFailure}.
-     * @param str   the string to parse as a UUID
-     * @return      either a parsed UUID, or a failure
+     *
+     * @param str the string to parse as a UUID
+     * @return either a parsed UUID, or a failure
      */
-    public static Either<UUID, UuidParseFailure> tryMakeUuid(String str) {
+    public static Result<UUID> tryMakeUuid(String str) {
         try {
-            return Either.left(UUID.fromString(str));
+            return Result.ok(UUID.fromString(str));
         } catch (IllegalArgumentException e) {
-            return Either.right(new UuidParseFailure("Failure parsing UUID String \"%s\": %s".formatted(str, e.getMessage()), Optional.of(e), Optional.of(str)));
+            return Result.err(new UuidParseFailure("Failure parsing UUID String \"%s\": %s".formatted(str, e.getMessage()), Optional.of(e), Optional.of(str)));
         }
     }
 }

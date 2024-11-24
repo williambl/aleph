@@ -2,6 +2,7 @@ package com.williambl.libs.aleph.async;
 
 import com.williambl.libs.aleph.either.Either;
 import com.williambl.libs.aleph.failure.Failure;
+import com.williambl.libs.aleph.failure.Result;
 
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
@@ -18,13 +19,13 @@ public class AAsync {
      * @param exceptionToFailure    a function to turn exceptions into right-values for the Either
      * @return                      a CompletableFuture of an Either
      */
-    public static <LOut, ROut, LIn extends LOut, RIn extends ROut> CompletableFuture<Either<LOut, ROut>> unwrapFuture(
-            Either<CompletableFuture<LIn>, RIn> eitherIn, Function<Exception, ROut> exceptionToFailure) {
-        return CompletableFuture.supplyAsync(() -> eitherIn.<ROut>mapRight($ -> $).flatMapLeft(l -> {
+    public static <LOut, LIn extends LOut> CompletableFuture<Result<LOut>> unwrapFuture(
+            Result<CompletableFuture<LIn>> eitherIn, Function<Exception, Failure> exceptionToFailure) {
+        return CompletableFuture.supplyAsync(() -> eitherIn.<Failure>mapErr($ -> $).then(l -> {
             try {
-                return Either.left(l.get());
+                return Result.ok(l.get());
             } catch (InterruptedException | ExecutionException e) {
-                return Either.right(exceptionToFailure.apply(e));
+                return Result.err(exceptionToFailure.apply(e));
             }
         }));
     }
@@ -35,8 +36,8 @@ public class AAsync {
      * @param eitherIn  the Either to unwrap
      * @return          a CompletableFuture of the unwrapped Either
      */
-    public static <L> CompletableFuture<Either<L, Failure>> unwrapFuture(
-            Either<CompletableFuture<L>, ? extends Failure> eitherIn) {
+    public static <L> CompletableFuture<Result<L>> unwrapFuture(
+            Result<CompletableFuture<L>> eitherIn) {
         return AAsync.unwrapFuture(eitherIn, e -> new AsyncFailure(e.getMessage(), Optional.of(e)));
     }
 
@@ -46,8 +47,8 @@ public class AAsync {
      * @param func      the function to map the Either's left side to a CompletableFuture of a new Either
      * @return          a CompletableFuture of the flatmapped Either
      */
-    public static <LIn, LOut> CompletableFuture<Either<LOut, Failure>> flatMapLeftAsync(CompletableFuture<Either<LIn, Failure>> either, Function<LIn, CompletableFuture<Either<LOut, Failure>>> func) {
-        return either.thenCompose(e -> unwrapFuture(e.mapLeft(func)))
-                .thenApply(e -> e.flatMapLeft($ -> $));
+    public static <LIn, LOut> CompletableFuture<Result<LOut>> flatMapLeftAsync(CompletableFuture<Result<LIn>> either, Function<LIn, CompletableFuture<Result<LOut>>> func) {
+        return either.thenCompose(e -> unwrapFuture(e.map(func)))
+                .thenApply(e -> e.then($ -> $));
     }
 }

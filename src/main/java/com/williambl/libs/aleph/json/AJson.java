@@ -3,6 +3,7 @@ package com.williambl.libs.aleph.json;
 import com.google.gson.*;
 import com.williambl.libs.aleph.either.Either;
 import com.williambl.libs.aleph.failure.Failure;
+import com.williambl.libs.aleph.failure.Result;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.Unmodifiable;
@@ -20,9 +21,10 @@ import java.util.stream.Collectors;
 public sealed interface AJson {
     /**
      * Convert a GSON JsonElement into an AJson.
-     * @param element   the GSON JsonElement
-     * @return          the AJson representation
-     * @throws IllegalStateException    if the JsonElement is not a primitive, null, object, or array. If this throws, it's a bug!
+     *
+     * @param element the GSON JsonElement
+     * @return the AJson representation
+     * @throws IllegalStateException if the JsonElement is not a primitive, null, object, or array. If this throws, it's a bug!
      */
     static AJson fromGson(JsonElement element) {
         switch (element) {
@@ -56,8 +58,9 @@ public sealed interface AJson {
 
     /**
      * Convert an AJson into a GSON JsonElement.
-     * @param json  the AJSon
-     * @return      the GSON representation
+     *
+     * @param json the AJSon
+     * @return the GSON representation
      */
     static JsonElement toGson(@NotNull AJson json) {
         switch (json) {
@@ -97,28 +100,30 @@ public sealed interface AJson {
     /**
      * Try to parse the given string as an AJson, with failures represented as {@link JsonParseFailure}.
      * JSON parsing is done with GSON in lenient mode.
-     * @param str   the string to parse as JSON
-     * @return      either a parsed JSON, or a failure.
+     *
+     * @param str the string to parse as JSON
+     * @return either a parsed JSON, or a failure.
      */
-    static Either<AJson, JsonParseFailure> parse(String str) {
+    static Result<AJson> parse(String str) {
         try {
-            return Either.left(AJson.fromGson(JsonParser.parseString(str)));
+            return Result.ok(AJson.fromGson(JsonParser.parseString(str)));
         } catch (JsonParseException e) {
-            return Either.right(new JsonParseFailure(e.getMessage(), Optional.of(e), Optional.of(str)));
+            return Result.err(new JsonParseFailure(e.getMessage(), Optional.of(e), Optional.of(str)));
         }
     }
 
     /**
      * Try to parse the given reader as an AJson, with failures represented as {@link JsonParseFailure}.
      * JSON parsing is done with GSON in lenient mode.
-     * @param reader    the reader to parse as JSON
-     * @return          either a parsed JSON, or a failure.
+     *
+     * @param reader the reader to parse as JSON
+     * @return either a parsed JSON, or a failure.
      */
-    static Either<AJson, JsonParseFailure> parse(Reader reader) {
+    static Result<AJson> parse(Reader reader) {
         try {
-            return Either.left(AJson.fromGson(JsonParser.parseReader(reader)));
+            return Result.ok(AJson.fromGson(JsonParser.parseReader(reader)));
         } catch (JsonParseException e) {
-            return Either.right(new JsonParseFailure(e.getMessage(), Optional.of(e), Optional.empty()));
+            return Result.err(new JsonParseFailure(e.getMessage(), Optional.of(e), Optional.empty()));
         }
     }
 
@@ -140,20 +145,28 @@ public sealed interface AJson {
         }
     }
 
-    default <T extends AJson> Either<T, JsonGetFailure> tryGetAs(Class<T> clazz) {
+    default <T extends AJson> Result<T> tryGetAs(Class<T> clazz) {
         if (clazz.isInstance(this)) {
-            return Either.left(clazz.cast(this));
+            return Result.ok(clazz.cast(this));
         } else {
-            return Either.right(JsonGetFailure.wrongType("JSON", clazz, this.getClass(), this));
+            return Result.err(JsonGetFailure.wrongType("JSON", clazz, this.getClass(), this));
         }
     }
 
     //TODO write
 
-    record AJsonString(String value) implements AJson {}
-    record AJsonNumber(double value) implements AJson {}
-    record AJsonBoolean(boolean value) implements AJson {}
-    record AJsonNull() implements AJson {}
+    record AJsonString(String value) implements AJson {
+    }
+
+    record AJsonNumber(double value) implements AJson {
+    }
+
+    record AJsonBoolean(boolean value) implements AJson {
+    }
+
+    record AJsonNull() implements AJson {
+    }
+
     record AJsonArray(@Unmodifiable List<AJson> values) implements AJson {
         public AJsonArray(List<AJson> values) {
             this.values = List.copyOf(values);
@@ -167,17 +180,18 @@ public sealed interface AJson {
             return Optional.ofNullable(this.get(index));
         }
 
-        public Either<AJson, Failure> tryGet(int index) {
-            return Either.of(this.maybeGet(index), () -> JsonGetFailure.noElement(index, this));
+        public Result<AJson> tryGet(int index) {
+            return Result.of(this.maybeGet(index), () -> JsonGetFailure.noElement(index, this));
         }
 
-        public <T extends AJson> Either<T, Failure> tryGet(int index, Class<T> clazz) {
-            return this.tryGet(index).flatMapLeft(j ->
+        public <T extends AJson> Result<T> tryGet(int index, Class<T> clazz) {
+            return this.tryGet(index).then(j ->
                     clazz.isInstance(j) ?
-                            Either.left(clazz.cast(j)) :
-                            Either.right(JsonGetFailure.wrongType(Integer.toString(index), clazz, j.getClass(), j)));
+                            Result.ok(clazz.cast(j)) :
+                            Result.err(JsonGetFailure.wrongType(Integer.toString(index), clazz, j.getClass(), j)));
         }
     }
+
     record AJsonObject(@Unmodifiable Map<String, AJson> properties) implements AJson {
         public AJsonObject(Map<String, AJson> properties) {
             this.properties = Map.copyOf(properties);
@@ -191,15 +205,15 @@ public sealed interface AJson {
             return Optional.ofNullable(this.properties.get(key));
         }
 
-        public Either<AJson, Failure> tryGet(String key) {
-            return Either.of(this.maybeGet(key), () -> JsonGetFailure.noProperty(key, this));
+        public Result<AJson> tryGet(String key) {
+            return Result.of(this.maybeGet(key), () -> JsonGetFailure.noProperty(key, this));
         }
 
-        public <T extends AJson> Either<T, Failure> tryGet(String key, Class<T> clazz) {
-            return this.tryGet(key).flatMapLeft(j ->
+        public <T extends AJson> Result<T> tryGet(String key, Class<T> clazz) {
+            return this.tryGet(key).then(j ->
                     clazz.isInstance(j) ?
-                            Either.left(clazz.cast(j)) :
-                            Either.right(JsonGetFailure.wrongType(key, clazz, j.getClass(), j)));
+                            Result.ok(clazz.cast(j)) :
+                            Result.err(JsonGetFailure.wrongType(key, clazz, j.getClass(), j)));
         }
     }
 }
